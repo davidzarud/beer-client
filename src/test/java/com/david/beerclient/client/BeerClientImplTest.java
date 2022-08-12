@@ -1,15 +1,16 @@
 package com.david.beerclient.client;
 
 import com.david.beerclient.config.WebClientConfig;
+import com.david.beerclient.dao.model.BeerDto;
 import com.david.beerclient.dao.model.BeerPagedList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.CollectionUtils;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
 
 class BeerClientImplTest {
 
@@ -23,6 +24,20 @@ class BeerClientImplTest {
 
     @Test
     void getBeerById() {
+
+        Mono<BeerPagedList> beerPagedListMono = beerClient.listBeers(1, 1, null, null, null);
+        BeerDto beerToFind = beerPagedListMono.block().getContent().get(0);
+        UUID beerToFindId = beerToFind.getId();
+        String beerToFindName = beerToFind.getBeerName();
+        String beerToFindStyle = beerToFind.getBeerStyle();
+
+        Mono<BeerDto> beerMono = beerClient.getBeerById(beerToFindId, false);
+        BeerDto beer = beerMono.block();
+
+        assertThat(beer).isNotNull();
+        assertThat(beer.getId().toString()).isEqualTo(beerToFindId.toString());
+        assertThat(beer.getBeerName()).isEqualTo(beerToFindName);
+        assertThat(beer.getBeerStyle()).isEqualTo(beerToFindStyle);
     }
 
     @Test
@@ -85,7 +100,7 @@ class BeerClientImplTest {
         assertThat(beerPagedList.getPageable().getPageSize()).isEqualTo(2);
 
         // Second Page
-        beerPagedListMono = beerClient.listBeers(1, 2, null, "WHEAT", true);
+        beerPagedListMono = beerClient.listBeers(1, 2, null, "WHEAT", false);
 
         beerPagedList = beerPagedListMono.block();
 
@@ -117,5 +132,19 @@ class BeerClientImplTest {
 
     @Test
     void getBeerByUpc() {
+
+        Mono<BeerPagedList> beerPagedListMono = beerClient.listBeers(1, 2, null, null, null);
+        BeerDto beerToFind = beerPagedListMono.block().getContent().get(0);
+        String beerToFindUpc = beerToFind.getUpc();
+        UUID beerToFindId = beerToFind.getId();
+        String beerToFindName = beerToFind.getBeerName();
+        String beerToFindStyle = beerToFind.getBeerStyle();
+
+        Mono<BeerDto> beerMono = beerClient.getBeerByUpc(beerToFindUpc);
+        BeerDto beer = beerMono.block();
+        assertThat(beer).isNotNull();
+        assertThat(beer.getId().toString()).isEqualTo(beerToFindId.toString());
+        assertThat(beer.getBeerName()).isEqualTo(beerToFindName);
+        assertThat(beer.getBeerStyle()).isEqualTo(beerToFindStyle);
     }
 }
