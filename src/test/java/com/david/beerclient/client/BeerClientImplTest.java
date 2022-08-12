@@ -8,12 +8,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BeerClientImplTest {
 
@@ -141,10 +144,53 @@ class BeerClientImplTest {
 
     @Test
     void updateBeer() {
+
+        // Create beer and get id (last in list)
+        createBeer();
+        Mono<BeerPagedList> beerPagedListMono = beerClient.listBeers(null, 200, null, null, null);
+        BeerDto createdBeer = beerPagedListMono.block().getContent().get(beerPagedListMono.block().getContent().size() - 1);
+        UUID createdBeerId = createdBeer.getId();
+        assertThat(createdBeer).isNotNull();
+        assertThat(createdBeer.getBeerName()).isEqualTo("Zarudsky");
+        assertThat(createdBeer.getBeerStyle()).isEqualTo("IPA");
+
+        // Create update beer dto
+        BeerDto beerToUpdate = BeerDto.builder()
+                .beerStyle("WHEAT")
+                .beerName(createdBeer.getBeerName())
+                .price(createdBeer.getPrice())
+                .upc(createdBeer.getUpc())
+                .build();
+
+        Mono<ResponseEntity<Void>> responseEntityMono = beerClient.updateBeer(createdBeerId, beerToUpdate);
+        ResponseEntity<Void> responseEntity = responseEntityMono.block();
+        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        BeerDto updatedBeer = beerPagedListMono.block().getContent().get(beerPagedListMono.block().getContent().size() - 1);
+        assertThat(updatedBeer.getId().toString()).isEqualTo(createdBeerId.toString());
+        assertThat(updatedBeer.getBeerStyle()).isEqualTo("WHEAT");
     }
 
     @Test
     void deleteBeerById() {
+
+        // List all beers and find last
+        Mono<BeerPagedList> beerPagedListMono = beerClient.listBeers(null, 200, null, null, null);
+        List<BeerDto> beerDtoList = beerPagedListMono.block().getContent();
+        BeerDto firstBeer = beerDtoList.stream().findFirst().get();
+        UUID lastBeerId = firstBeer.getId();
+        Integer beerDtoListSize = beerDtoList.size();
+
+        // Delete first beer by uuid
+        Mono<ResponseEntity<Void>> responseEntityMono = beerClient.deleteBeerById(lastBeerId);
+        ResponseEntity<Void> responseEntity = responseEntityMono.block();
+        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        Mono<BeerPagedList> beerPagedListMonoAfterDelete = beerClient.listBeers(null, 200, null, null, null);
+        assertThat(beerPagedListMonoAfterDelete.block().getContent().size()).isEqualTo(beerDtoListSize - 1);
+
+        // Try to delete again
+        assertThrows(WebClientResponseException.class, () -> beerClient.deleteBeerById(lastBeerId).block());
     }
 
     @Test
